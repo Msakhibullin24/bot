@@ -1,0 +1,6 @@
+SQLAlchemy==1.4.46
+psycopg2==2.9.5
+phonenumbers==8.13.4
+alembic==1.9.2
+aiogram==2.24
+SQLAlchemy-Utils==0.39.0

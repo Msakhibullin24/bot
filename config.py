@@ -1,2 +1,7 @@
 TOKEN = "5964149984:AAEZfCcuFS9wqiFycIUqaCsuiGM10S03hQA"
 PAYMENTS_TOKEN = ""
+
+DB_NAME = 'bot'
+DB_USER = 'mapc'
+DB_PASSWORD = 'mapc'
+DB_HOST = '127.0.0.1'

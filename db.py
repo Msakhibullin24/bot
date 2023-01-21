@@ -1,0 +1,184 @@
+import enum
+
+from sqlalchemy import Column, Integer, String, func, DateTime, ForeignKey, CheckConstraint, UniqueConstraint, \
+    TIME, PrimaryKeyConstraint, Enum, create_engine
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy_utils import PhoneNumberType
+
+from config import DB_USER, DB_PASSWORD, DB_HOST, DB_NAME
+
+engine = create_engine(f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}', future=True, hide_parameters=True)
+
+engine.connect()
+Session = sessionmaker()
+Session.configure(bind=engine)
+
+
+Base = declarative_base()
+
+
+class PaymentStatusEnum(enum.Enum):
+    checked = 0  # оплата проверена
+    no_checked = 1  # оплата не проверена
+    no_payment = 2  # не оплачено
+
+
+class WeekDaysEnum(enum.Enum):
+    monday = 0
+    tuesday = 1
+    wednesday = 2
+    thursday = 3
+    friday = 4
+    saturday = 5
+    sunday = 6
+
+
+class BaseMixin(object):
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+
+class Parent(Base):
+    __tablename__ = "parent"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+    name = Column(String)
+    surname = Column(String)
+    patronymic = Column(String)
+    phone_number = Column(PhoneNumberType(), unique=True)
+
+    children = relationship("Children", back_populates="parent")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.id}, "
+            f"name='{self.name}', "
+            f"surname='{self.surname}', "
+            f"phone_number='{self.phone_number}')>"
+        )
+
+
+class Children(Base, BaseMixin):
+    __tablename__ = "children"
+    __table_args__ = (
+        CheckConstraint('age > 0'),
+        CheckConstraint('age < 100'),
+    )
+
+    name = Column(String)
+    surname = Column(String)
+    patronymic = Column(String)
+    age = Column(Integer)
+    parent_id = Column(Integer, ForeignKey("parent.id"))
+
+    parent = relationship("Parent", back_populates="children")
+    requests = relationship("Request", back_populates="children")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.id}, "
+            f"name='{self.name}', "
+            f"surname='{self.surname}', "
+            f"age='{self.age}',"
+            f"parent_id='{self.parent_id}')>"
+        )
+
+
+class Course(Base, BaseMixin):
+    __tablename__ = "course"
+    __table_args__ = (
+        CheckConstraint('price >= 0'),
+        CheckConstraint('duration >= 0'),
+        CheckConstraint('age > 0'),
+        CheckConstraint('age < 100'),
+    )
+
+    name = Column(String, unique=True)
+    price = Column(Integer)
+    duration = Column(Integer)
+    age = Column(Integer)
+
+    course_groups = relationship("CourseGroup", back_populates="course")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.id}, "
+            f"name='{self.name}', "
+            f"price='{self.price}', "
+            f"duration='{self.duration}',"
+            f"age='{self.age}')>"
+        )
+
+
+class CourseGroup(Base, BaseMixin):
+    __tablename__ = "course_group"
+    __table_args__ = (
+        CheckConstraint('free_places >= 0'),
+    )
+
+    name = Column(String)
+    free_places = Column(Integer)
+    course_id = Column(Integer, ForeignKey("course.id"))
+
+    course = relationship("Course", back_populates="course_groups")
+    requests = relationship("Request", back_populates="course_group")
+    course_group_timetables = relationship("CourseGroupTimetable", back_populates="course_group")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.id}, "
+            f"free_places='{self.free_places}', "
+            f"course='{self.course}')>"
+        )
+
+
+class CourseGroupTimetable(Base, BaseMixin):
+    __tablename__ = "course_group_timetable"
+
+    course_group_id = Column(Integer, ForeignKey("course_group.id"))
+    time = Column(TIME())
+    weekday = Column(Enum(WeekDaysEnum))
+
+    course_group = relationship("CourseGroup", back_populates="course_group_timetables")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.id}, "
+            f"course_group_id='{self.course_group_id}', "
+            f"time='{self.time}', "
+            f"weekday='{self.weekday}',"
+            f"course_group='{self.course_group}')>"
+        )
+
+
+class Request(Base):
+    __tablename__ = "request"
+
+    __table_args__ = (
+        PrimaryKeyConstraint('course_group_id', 'children_id'),
+    )
+    course_group_id = Column(Integer, ForeignKey("course_group.id"))
+    children_id = Column(Integer, ForeignKey("children.id"))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+    payment_status = Column(Enum(PaymentStatusEnum), default=PaymentStatusEnum.no_payment)
+
+    course_group = relationship("CourseGroup", back_populates="requests")
+    children = relationship("Children", back_populates="requests")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"course_group={self.course_group}, "
+            f"children='{self.children}', "
+            f"payment_status='{self.payment_status}')>"
+        )
