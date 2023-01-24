@@ -104,5 +104,10 @@ def create_request():
         session.commit()
 
 
+def get_all_courses():
+    with Session() as session:
+        print(session.query(Course).all())
+
+
 if __name__ == '__main__':
-    create_request()
+    get_all_courses()
