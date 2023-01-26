@@ -4,7 +4,7 @@ from sqlalchemy_utils import PhoneNumber
 
 from db import Parent, Session, Children, Course, CourseGroup, CourseGroupTimetable, WeekDaysEnum, Request, \
     PaymentStatusEnum
-
+from db import Session
 
 def create_parent():
     with Session() as session:
@@ -81,6 +81,9 @@ def create_course_group_with_timetable():
             course_group2, course_group_timetable21, course_group_timetable22
         ])
         session.commit()
+
+
+# def create_web_design():
 
 
 def create_request():
