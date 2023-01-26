@@ -54,6 +54,7 @@ async def successful_payment(message: types.Message):
                            f"Платёж на сумму {message.successful_payment.total_amount // 100} {message.successful_payment.currency} прошел успешно!!!")
 
 
+
 # run long-polling
-if __name__ == "__main__":
+if __name__ == "main":
     executor.start_polling(dp, skip_updates=False)

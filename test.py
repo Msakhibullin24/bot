@@ -9,10 +9,18 @@ from db import Parent, Session, Children, Course, CourseGroup, CourseGroupTimeta
 def create_parent():
     with Session() as session:
         # Создаю Родителя
-        parent = Parent(id=2343, name='name', surname='surname', patronymic='patronymic', phone_number=PhoneNumber('343475345', 'RU'))
+        # parent = Parent(id=600)
 
         # Сохраняю его
-        session.add(parent)
+        # session.add(parent)
+        # session.commit()
+
+        p = session.query(Parent).filter(Parent.id == 600).first()
+        p.name = '123'
+
+        print(p)
+
+        session.add(p)
         session.commit()
 
 
@@ -110,4 +118,4 @@ def get_all_courses():
 
 
 if __name__ == '__main__':
-    get_all_courses()
+    create_parent()
