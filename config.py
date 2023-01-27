@@ -1,7 +1,13 @@
-TOKEN = "5964149984:AAEZfCcuFS9wqiFycIUqaCsuiGM10S03hQA"
-PAYMENTS_TOKEN = ""
+import os
+from dotenv import load_dotenv
 
-DB_NAME = 'bot'
-DB_USER = 'postgres'
-DB_PASSWORD = 'meteor23'
-DB_HOST = '127.0.0.1'
+load_dotenv()
+
+TOKEN = os.getenv('BOT_TOKEN')
+
+PAYMENTS_TOKEN = os.getenv('PAYMENTS_TOKEN')
+
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')

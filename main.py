@@ -4,6 +4,8 @@ import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types.message import ContentType
 
+from db import Parent, Session
+
 # log
 logging.basicConfig(level=logging.INFO)
 
@@ -54,7 +56,24 @@ async def successful_payment(message: types.Message):
                            f"Платёж на сумму {message.successful_payment.total_amount // 100} {message.successful_payment.currency} прошел успешно!!!")
 
 
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.reply("Send your surname, name and patronymic in this order")
 
-# run long-polling
-if __name__ == "main":
+
+@dp.message_handler()
+async def echo(message: types.Message):
+    try:
+        surname, name, patronymic = message.text.split(' ')
+        chat_id = message.chat.id
+        with Session() as session:
+            parent = Parent(id=chat_id, name=name, surname=surname, patronymic=patronymic)
+            session.add(parent)
+            session.commit()
+            await message.answer(f'created parent: {parent}')
+    except ValueError:
+        await message.answer('surname, name and patronymic not correct')
+
+
+if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=False)
