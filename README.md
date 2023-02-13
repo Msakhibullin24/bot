@@ -6,5 +6,3 @@
 4. ```bash
     alembic upgrade head
     ```
-
-удаление последнего ребенка
