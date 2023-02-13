@@ -1,11 +1,11 @@
 import enum
 
-from sqlalchemy import Column, Integer, String, func, DateTime, ForeignKey, CheckConstraint, UniqueConstraint, \
-    TIME, PrimaryKeyConstraint, Enum, create_engine
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy import Column, Integer, String, func, DateTime, ForeignKey, CheckConstraint, TIME, PrimaryKeyConstraint, \
+    Enum, create_engine, Date, BigInteger
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, validates
 from sqlalchemy_utils import PhoneNumberType
 
-from config import DB_USER, DB_PASSWORD, DB_HOST, DB_NAME
+from app.config import DB_USER, DB_PASSWORD, DB_HOST, DB_NAME
 
 engine = create_engine(f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}', future=True, hide_parameters=True)
 
@@ -24,17 +24,17 @@ class PaymentStatusEnum(enum.Enum):
 
 
 class WeekDaysEnum(enum.Enum):
-    monday = 0
-    tuesday = 1
-    wednesday = 2
-    thursday = 3
-    friday = 4
-    saturday = 5
-    sunday = 6
+    monday = 'Понедельник'
+    tuesday = 'Вторник'
+    wednesday = 'Среда'
+    thursday = 'Четверг'
+    friday = 'Пятница'
+    saturday = 'Суббота'
+    sunday = 'Воскресенье'
 
 
 class BaseMixin(object):
-    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
@@ -42,7 +42,7 @@ class BaseMixin(object):
 class Parent(Base):
     __tablename__ = "parent"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
@@ -52,6 +52,10 @@ class Parent(Base):
     phone_number = Column(PhoneNumberType(), unique=True)
 
     children = relationship("Children", back_populates="parent")
+
+    @validates('name', 'surname', 'patronymic')
+    def convert_capitalize(self, key, value):
+        return value.capitalize()
 
     def __repr__(self) -> str:
         return (
@@ -65,19 +69,19 @@ class Parent(Base):
 
 class Children(Base, BaseMixin):
     __tablename__ = "children"
-    __table_args__ = (
-        CheckConstraint('age > 0'),
-        CheckConstraint('age < 100'),
-    )
 
     name = Column(String)
     surname = Column(String)
     patronymic = Column(String)
-    age = Column(Integer)
-    parent_id = Column(Integer, ForeignKey("parent.id"))
+    date_of_birth = Column(Date, )
+    parent_id = Column(BigInteger, ForeignKey("parent.id"))
 
     parent = relationship("Parent", back_populates="children")
     requests = relationship("Request", back_populates="children")
+
+    @validates('name', 'surname', 'patronymic')
+    def convert_capitalize(self, key, value):
+        return value.capitalize()
 
     def __repr__(self) -> str:
         return (
@@ -85,7 +89,7 @@ class Children(Base, BaseMixin):
             f"id={self.id}, "
             f"name='{self.name}', "
             f"surname='{self.surname}', "
-            f"age='{self.age}',"
+            f"date_of_birth='{self.date_of_birth}',"
             f"parent_id='{self.parent_id}')>"
         )
 
@@ -167,7 +171,7 @@ class Request(Base):
         PrimaryKeyConstraint('course_group_id', 'children_id'),
     )
     course_group_id = Column(Integer, ForeignKey("course_group.id"))
-    children_id = Column(Integer, ForeignKey("children.id"))
+    children_id = Column(BigInteger, ForeignKey("children.id"))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
     payment_status = Column(Enum(PaymentStatusEnum), default=PaymentStatusEnum.no_payment)

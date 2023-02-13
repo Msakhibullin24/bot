@@ -1,23 +1,30 @@
-import config
+import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher, executor, types
+from aiogram import Bot, Dispatcher, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types.message import ContentType
 
-from db import Parent, Session
+import config
+from app.handlers.add_children import register_handlers_add_children
+from app.handlers.children_list import register_handlers_children_list
+from app.handlers.common import register_handlers_common
+from app.handlers.parent import register_handlers_parent
+from app.handlers.registration import register_handlers_registration
+from app.handlers.edit_parent import register_handlers_edit_parent
+from handlers.course_list import register_handlers_course_list
+from handlers.edit_children import register_handlers_edit_children
+from handlers.request_list import register_handlers_request_list
 
-# log
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# init
 bot = Bot(token=config.TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher(bot, storage=MemoryStorage())
 
-# prices
 PRICE = types.LabeledPrice(label="мастер класс", amount=500*100)  # в копейках (руб)
 
 
-# buy
 @dp.message_handler(commands=['buy'])
 async def buy(message: types.Message):
     if config.PAYMENTS_TOKEN.split(':')[1] == 'TEST':
@@ -56,24 +63,19 @@ async def successful_payment(message: types.Message):
                            f"Платёж на сумму {message.successful_payment.total_amount // 100} {message.successful_payment.currency} прошел успешно!!!")
 
 
-@dp.message_handler(commands=['start'])
-async def send_welcome(message: types.Message):
-    await message.reply("Send your surname, name and patronymic in this order")
+async def main():
+    register_handlers_common(dp)
+    register_handlers_registration(dp)
+    register_handlers_parent(dp)
+    register_handlers_edit_parent(dp)
+    register_handlers_add_children(dp)
+    register_handlers_children_list(dp)
+    register_handlers_edit_children(dp)
+    register_handlers_course_list(dp)
+    register_handlers_request_list(dp)
 
-
-@dp.message_handler()
-async def echo(message: types.Message):
-    try:
-        surname, name, patronymic = message.text.split(' ')
-        chat_id = message.chat.id
-        with Session() as session:
-            parent = Parent(id=chat_id, name=name, surname=surname, patronymic=patronymic)
-            session.add(parent)
-            session.commit()
-            await message.answer(f'created parent: {parent}')
-    except ValueError:
-        await message.answer('surname, name and patronymic not correct')
-
+    await dp.skip_updates()
+    await dp.start_polling()
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=False)
+    asyncio.run(main())

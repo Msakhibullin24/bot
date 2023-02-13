@@ -2,9 +2,9 @@ from datetime import time
 
 from sqlalchemy_utils import PhoneNumber
 
-from db import Parent, Session, Children, Course, CourseGroup, CourseGroupTimetable, WeekDaysEnum, Request, \
+from app.db import Parent, Children, Course, CourseGroup, CourseGroupTimetable, WeekDaysEnum, Request, \
     PaymentStatusEnum
-from db import Session
+from app.db import Session
 
 def create_parent():
     with Session() as session:
@@ -27,10 +27,10 @@ def create_parent():
 def create_children():
     with Session() as session:
         # Создаю Родителя
-        parent = Parent(id=123, name='name', surname='surname', patronymic='patronymic', phone_number=PhoneNumber('1232434530', 'RU'))
+        parent = Parent(id=123, name='name', surname='waiting_for_surname', patronymic='patronymic', phone_number=PhoneNumber('1232434530', 'RU'))
 
         # Создаю Ребенка, указываю ему родителя сверху
-        children = Children(name='name', surname='surname', patronymic='patronymic', age=8, parent=parent)
+        children = Children(name='name', surname='waiting_for_surname', patronymic='patronymic', age=8, parent=parent)
 
         # Сохраняю все
         session.add_all([parent, children])
@@ -93,8 +93,8 @@ def create_request():
     # Стоимость — 8 800 ₽ в месяц
     with Session() as session:
         # Создаю Родителя и Ребенка
-        parent = Parent(id=456, name='name', surname='surname', patronymic='patronymic', phone_number=PhoneNumber('4321434530', 'RU'))
-        children = Children(name='name', surname='surname', patronymic='patronymic', age=8, parent=parent)
+        parent = Parent(id=456, name='name', surname='waiting_for_surname', patronymic='patronymic', phone_number=PhoneNumber('4321434530', 'RU'))
+        children = Children(name='name', surname='waiting_for_surname', patronymic='patronymic', age=8, parent=parent)
 
         # Создаю курс
         course = Course(name='Видеограф-клипмейкер', price=8800, duration=90, age=12)

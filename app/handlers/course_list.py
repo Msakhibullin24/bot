@@ -1,0 +1,187 @@
+from aiogram import Dispatcher, types, Bot
+from aiogram.dispatcher import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from sqlalchemy.orm import joinedload
+
+from app.db import Session, Children, Course, CourseGroup, Request
+from app.states.children_list import ChildrenListStatesGroup
+from config import COURSES_PAGE_SIZE, TOKEN
+from states.common import cancel_button, previous_button, next_button
+from states.course_list import CourseListStatesGroup
+
+bot = Bot(token=TOKEN)
+
+
+def get_courses(session, page=0):
+    return session.query(Course).order_by(Course.name).limit(COURSES_PAGE_SIZE).offset(COURSES_PAGE_SIZE * page).all()
+
+
+def get_keyboard_of_courses(courses) -> InlineKeyboardMarkup:
+    keyboard = InlineKeyboardMarkup()
+    for course in courses:
+        course_button = InlineKeyboardButton(course.name, callback_data=course.id)
+        keyboard.row(course_button)
+    return keyboard
+
+
+async def cancel(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.finish()
+    await ChildrenListStatesGroup.waiting_for_action.apply(callback_query=callback_query)
+
+
+async def back(callback_query: types.CallbackQuery, state: FSMContext):
+    current_state = await CourseListStatesGroup.previous()
+    last_message = await CourseListStatesGroup().__getattribute__(current_state.split(':')[-1]). \
+        apply(callback_query=callback_query)
+    await state.update_data(last_message=last_message)
+
+
+async def start(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(page=0)
+    with Session() as session:
+        courses = get_courses(session)
+        if not courses:
+            await callback_query.answer("Нет курсов для вашего ребенка")
+            return
+
+        keyboard: InlineKeyboardMarkup = get_keyboard_of_courses(courses)
+
+    keyboard.row(next_button)
+    keyboard.row(cancel_button)
+    await CourseListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
+
+
+async def next_list(callback_query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    page = data.get('page') + 1
+
+    with Session() as session:
+        count = session.query(Course).count()
+        courses = get_courses(session, page)
+        keyboard: InlineKeyboardMarkup = get_keyboard_of_courses(courses)
+
+    await state.update_data(page=page)
+
+    if count - COURSES_PAGE_SIZE * (page + 1) > 0:
+        keyboard.row(previous_button, next_button)
+    else:
+        keyboard.row(previous_button)
+    keyboard.row(cancel_button)
+    await CourseListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
+
+
+async def previous_list(callback_query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    page = data.get('page') - 1
+    with Session() as session:
+        courses = get_courses(session, page)
+        keyboard: InlineKeyboardMarkup = get_keyboard_of_courses(courses)
+
+    await state.update_data(page=page)
+
+    if page > 0:
+        keyboard.row(previous_button, next_button)
+    else:
+        keyboard.row(next_button)
+    keyboard.row(cancel_button)
+    await CourseListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
+
+
+async def entered_course(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(course_id=callback_query.data)
+    data = await state.get_data()
+    with Session() as session:
+        groups = session.query(CourseGroup).filter(CourseGroup.course_id == callback_query.data)\
+            .join(CourseGroup.course_group_timetables).all()
+        if not groups:
+            await callback_query.answer("Нет свободных групп")
+            return
+
+        request = session.query(Request).\
+            filter(
+                Request.course_group_id.in_([group.id for group in groups]),
+                Request.children_id == data.get('children_id')
+            ).first()
+
+        if request:
+            await callback_query.answer("Заявка на этот курс уже отправлена")
+            return
+
+        messages = []
+        message = await CourseListStatesGroup.waiting_for_group.apply(message=callback_query.message)
+        messages.append(message.message_id)
+
+        await callback_query.message.delete()
+        for group in groups:
+            message_text = f'{group.name}\n'
+            for timetable in group.course_group_timetables:
+                message_text += f'{timetable.time} {timetable.weekday.value}\n'
+            keyboard = InlineKeyboardMarkup()
+            request_button = InlineKeyboardButton('Выбрать', callback_data=group.id)
+            keyboard.row(request_button)
+            message = await callback_query.message.answer(message_text, reply_markup=keyboard)
+            messages.append(message.message_id)
+
+    await state.update_data(messages_to_delete=messages)
+
+
+async def entered_group(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(group_id=callback_query.data)
+    data = await state.get_data()
+    for message_id in data.get('messages_to_delete'):
+        await bot.delete_message(callback_query.message.chat.id, message_id)
+
+    with Session() as session:
+        children = session.query(Children).filter(Children.id == data.get('children_id')).first()
+        group = session.query(CourseGroup).filter(CourseGroup.id == data.get('group_id')).join(CourseGroup.course)\
+            .join(CourseGroup.course_group_timetables).first()
+
+        if not group:
+            await callback_query.answer("В группе нет места")
+            return
+
+        message_text = f'{children.name} {children.surname[0]}.\n' \
+                       f'{group.course.name}\n' \
+                       f'{group.name}\n'
+        for timetable in group.course_group_timetables:
+            message_text += f'{timetable.time} {timetable.weekday.value}\n'
+
+        keyboard = InlineKeyboardMarkup()
+        request_button = InlineKeyboardButton('Записаться', callback_data=group.id)
+        keyboard.row(request_button)
+        await CourseListStatesGroup.end.apply(message_text=message_text, message=callback_query.message, keyboard=keyboard)
+
+
+async def end(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(group_id=callback_query.data)
+    data = await state.get_data()
+
+    with Session() as session:
+        children = session.query(Children).filter(Children.id == data.get('children_id')).first()
+        group = session.query(CourseGroup).filter(CourseGroup.id == data.get('group_id')).join(CourseGroup.course)\
+            .join(CourseGroup.course_group_timetables).first()
+
+        if not group:
+            await callback_query.answer("В группе нет места")
+            return
+
+        request = Request(children=children, course_group=group)
+        session.add(request)
+        session.commit()
+
+        await state.finish()
+        await ChildrenListStatesGroup.waiting_for_action.apply(callback_query=callback_query)
+        state = Dispatcher.get_current().current_state()
+        await state.update_data(children_id=data.get('children_id'))
+
+
+def register_handlers_course_list(dp: Dispatcher):
+    dp.register_callback_query_handler(back, lambda c: c.data == 'back', state=CourseListStatesGroup.all_states[1:])
+    dp.register_callback_query_handler(cancel, lambda c: c.data == 'cancel', state=CourseListStatesGroup.all_states)
+
+    dp.register_callback_query_handler(start, lambda c: c.data == 'course_list', state=ChildrenListStatesGroup.waiting_for_action)
+    dp.register_callback_query_handler(next_list, lambda c: c.data == 'next', state=CourseListStatesGroup.waiting_for_course)
+    dp.register_callback_query_handler(previous_list, lambda c: c.data == 'previous', state=CourseListStatesGroup.waiting_for_course)
+    dp.register_callback_query_handler(entered_course, state=CourseListStatesGroup.waiting_for_course)
+    dp.register_callback_query_handler(entered_group, state=CourseListStatesGroup.waiting_for_group)
+    dp.register_callback_query_handler(end, state=CourseListStatesGroup.end)
