@@ -5,3 +5,4 @@ alembic==1.9.2
 aiogram==2.24
 SQLAlchemy-Utils==0.39.0
 python-dotenv==0.21.1
+Django==4.1.7
