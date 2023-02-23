@@ -50,6 +50,7 @@ cancel_button = InlineKeyboardButton('Отмена', callback_data='cancel')
 create_button = InlineKeyboardButton('Создать', callback_data='create')
 delete_button = InlineKeyboardButton('Удалить', callback_data='delete')
 save_button = InlineKeyboardButton('Сохранить', callback_data='save')
+pay_button = InlineKeyboardButton('Оплатить', callback_data='pay')
 
 previous_button = InlineKeyboardButton('Предыдущая страница', callback_data='previous')
 next_button = InlineKeyboardButton('Следующая страница', callback_data='next')

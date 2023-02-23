@@ -1,7 +1,7 @@
 import enum
 
 from sqlalchemy import Column, Integer, String, func, DateTime, ForeignKey, CheckConstraint, TIME, PrimaryKeyConstraint, \
-    Enum, create_engine, Date, BigInteger
+    Enum, create_engine, Date, BigInteger, Boolean
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, validates
 from sqlalchemy_utils import PhoneNumberType
 
@@ -18,9 +18,9 @@ Base = declarative_base()
 
 
 class PaymentStatusEnum(enum.Enum):
-    checked = 0  # оплата проверена
-    no_checked = 1  # оплата не проверена
-    no_payment = 2  # не оплачено
+    checked = 'Оплата подтверждена'
+    no_checked = 'Оплата произведена'
+    no_payment = 'Не оплачено'
 
 
 class WeekDaysEnum(enum.Enum):
@@ -107,6 +107,7 @@ class Course(Base, BaseMixin):
     price = Column(Integer)
     duration = Column(Integer)
     age = Column(Integer)
+    is_master_class = Column(Boolean, default=True)
 
     course_groups = relationship("CourseGroup", back_populates="course")
 

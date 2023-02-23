@@ -1,9 +1,10 @@
 from aiogram.dispatcher.filters.state import StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from app.states.common import CustomState, delete_button, back_button, cancel_button
+from app.states.common import CustomState, delete_button, back_button, cancel_button, pay_button
 
 action_keyboard = InlineKeyboardMarkup()
+# action_keyboard.row(pay_button)
 action_keyboard.add(delete_button)
 action_keyboard.row(back_button, cancel_button)
 

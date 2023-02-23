@@ -14,6 +14,7 @@ from app.handlers.registration import register_handlers_registration
 from app.handlers.edit_parent import register_handlers_edit_parent
 from handlers.course_list import register_handlers_course_list
 from handlers.edit_children import register_handlers_edit_children
+from handlers.master_class_list import register_handlers_master_class_list
 from handlers.request_list import register_handlers_request_list
 
 logging.basicConfig(level=logging.INFO)
@@ -72,6 +73,7 @@ async def main():
     register_handlers_children_list(dp)
     register_handlers_edit_children(dp)
     register_handlers_course_list(dp)
+    register_handlers_master_class_list(dp)
     register_handlers_request_list(dp)
 
     await dp.skip_updates()

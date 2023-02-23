@@ -1,20 +1,33 @@
+from datetime import date
+
 from aiogram import Dispatcher, types, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from sqlalchemy.orm import joinedload
 
 from app.db import Session, Children, Course, CourseGroup, Request
 from app.states.children_list import ChildrenListStatesGroup
 from config import COURSES_PAGE_SIZE, TOKEN
-from handlers.master_class_list import calculate_age
 from states.common import cancel_button, previous_button, next_button, back_button
-from states.course_list import CourseListStatesGroup
+from states.master_class_list import MasterClassListStatesGroup
 
 bot = Bot(token=TOKEN)
 
 
+def calculate_age(born):
+    today = date.today()
+    try:
+        birthday = born.replace(year=today.year)
+    except ValueError:
+        birthday = born.replace(year=today.year,
+                                month=born.month + 1, day=1)
+    if birthday > today:
+        return today.year - born.year - 1
+    else:
+        return today.year - born.year
+
+
 def get_courses(session, age, page=0):
-    return session.query(Course).filter(Course.is_master_class == False).filter(age >= Course.age).order_by(Course.name).limit(COURSES_PAGE_SIZE).offset(COURSES_PAGE_SIZE * page).all()
+    return session.query(Course).filter(Course.is_master_class == True).filter(age >= Course.age).order_by(Course.name).limit(COURSES_PAGE_SIZE).offset(COURSES_PAGE_SIZE * page).all()
 
 
 def get_keyboard_of_courses(courses) -> InlineKeyboardMarkup:
@@ -38,8 +51,8 @@ async def back(callback_query: types.CallbackQuery, state: FSMContext):
             for message_id in messages_to_delete[:-1]:
                 await bot.delete_message(callback_query.message.chat.id, message_id)
         return await start(callback_query, state)
-    current_state = await CourseListStatesGroup.previous()
-    last_message = await CourseListStatesGroup().__getattribute__(current_state.split(':')[-1]). \
+    current_state = await MasterClassListStatesGroup.previous()
+    last_message = await MasterClassListStatesGroup().__getattribute__(current_state.split(':')[-1]). \
         apply(callback_query=callback_query)
     await state.update_data(last_message=last_message)
 
@@ -55,15 +68,16 @@ async def start(callback_query: types.CallbackQuery, state: FSMContext):
 
         courses = get_courses(session, age=age)
         if not courses:
-            await callback_query.answer("Нет курсов для вашего ребенка")
+            await callback_query.answer("Нет мастер классов для вашего ребенка")
             return
 
         keyboard: InlineKeyboardMarkup = get_keyboard_of_courses(courses)
-        courses_count = session.query(Course).filter(Course.is_master_class == False).filter(age >= Course.age).count()
+        courses_count = session.query(Course).filter(Course.is_master_class == True).filter(age >= Course.age).count()
+
     if courses_count > len(courses):
         keyboard.row(next_button)
     keyboard.row(cancel_button)
-    await CourseListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
+    await MasterClassListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
 
 
 async def next_list(callback_query: types.CallbackQuery, state: FSMContext):
@@ -83,7 +97,7 @@ async def next_list(callback_query: types.CallbackQuery, state: FSMContext):
     else:
         keyboard.row(previous_button)
     keyboard.row(cancel_button)
-    await CourseListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
+    await MasterClassListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
 
 
 async def previous_list(callback_query: types.CallbackQuery, state: FSMContext):
@@ -100,7 +114,7 @@ async def previous_list(callback_query: types.CallbackQuery, state: FSMContext):
     else:
         keyboard.row(next_button)
     keyboard.row(cancel_button)
-    await CourseListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
+    await MasterClassListStatesGroup.waiting_for_course.apply(callback_query=callback_query, keyboard=keyboard)
 
 
 async def entered_course(callback_query: types.CallbackQuery, state: FSMContext):
@@ -124,7 +138,7 @@ async def entered_course(callback_query: types.CallbackQuery, state: FSMContext)
             return
 
         messages = []
-        message = await CourseListStatesGroup.waiting_for_group.apply(message=callback_query.message)
+        message = await MasterClassListStatesGroup.waiting_for_group.apply(message=callback_query.message)
         messages.append(message.message_id)
 
         await callback_query.message.delete()
@@ -174,7 +188,7 @@ async def entered_group(callback_query: types.CallbackQuery, state: FSMContext):
         keyboard = InlineKeyboardMarkup()
         request_button = InlineKeyboardButton('Записаться', callback_data=group.id)
         keyboard.row(back_button, cancel_button, request_button)
-        await CourseListStatesGroup.end.apply(message_text=message_text, message=callback_query.message, keyboard=keyboard)
+        await MasterClassListStatesGroup.end.apply(message_text=message_text, message=callback_query.message, keyboard=keyboard)
 
 
 async def end(callback_query: types.CallbackQuery, state: FSMContext):
@@ -200,13 +214,13 @@ async def end(callback_query: types.CallbackQuery, state: FSMContext):
         await state.update_data(children_id=data.get('children_id'))
 
 
-def register_handlers_course_list(dp: Dispatcher):
-    dp.register_callback_query_handler(back, lambda c: c.data == 'back', state=CourseListStatesGroup.all_states[1:])
-    dp.register_callback_query_handler(cancel, lambda c: c.data == 'cancel', state=CourseListStatesGroup.all_states)
+def register_handlers_master_class_list(dp: Dispatcher):
+    dp.register_callback_query_handler(back, lambda c: c.data == 'back', state=MasterClassListStatesGroup.all_states[1:])
+    dp.register_callback_query_handler(cancel, lambda c: c.data == 'cancel', state=MasterClassListStatesGroup.all_states)
 
-    dp.register_callback_query_handler(start, lambda c: c.data == 'course_list', state=ChildrenListStatesGroup.waiting_for_action)
-    dp.register_callback_query_handler(next_list, lambda c: c.data == 'next', state=CourseListStatesGroup.waiting_for_course)
-    dp.register_callback_query_handler(previous_list, lambda c: c.data == 'previous', state=CourseListStatesGroup.waiting_for_course)
-    dp.register_callback_query_handler(entered_course, state=CourseListStatesGroup.waiting_for_course)
-    dp.register_callback_query_handler(entered_group, state=CourseListStatesGroup.waiting_for_group)
-    dp.register_callback_query_handler(end, state=CourseListStatesGroup.end)
+    dp.register_callback_query_handler(start, lambda c: c.data == 'master_class_list', state=ChildrenListStatesGroup.waiting_for_action)
+    dp.register_callback_query_handler(next_list, lambda c: c.data == 'next', state=MasterClassListStatesGroup.waiting_for_course)
+    dp.register_callback_query_handler(previous_list, lambda c: c.data == 'previous', state=MasterClassListStatesGroup.waiting_for_course)
+    dp.register_callback_query_handler(entered_course, state=MasterClassListStatesGroup.waiting_for_course)
+    dp.register_callback_query_handler(entered_group, state=MasterClassListStatesGroup.waiting_for_group)
+    dp.register_callback_query_handler(end, state=MasterClassListStatesGroup.end)
