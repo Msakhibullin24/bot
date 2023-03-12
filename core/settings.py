@@ -125,9 +125,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = 'static/'
-
+STATIC_URL = '/static/'
+MEDIA_URL = 'app/'
+MEDIA_ROOT = 'app/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+TOKEN = os.getenv("BOT_TOKEN")
+TELEGRAM_URL = "https://api.telegram.org/bot"

@@ -140,7 +140,7 @@ async def entered_course(callback_query: types.CallbackQuery, state: FSMContext)
 
         message_text = f'{groups[-1].name}\n'
         for timetable in groups[-1].course_group_timetables:
-            message_text += f'{timetable.time.strftime("%H:%M")} {timetable.weekday.value}\n'
+            message_text += f'{timetable.weekday.value}, {timetable.time.strftime("%H:%M")}\n'
         keyboard = InlineKeyboardMarkup()
         request_button = InlineKeyboardButton('Выбрать', callback_data=groups[-1].id)
         keyboard.row(back_button, cancel_button, request_button)

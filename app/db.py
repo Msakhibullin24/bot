@@ -1,7 +1,7 @@
 import enum
 
 from sqlalchemy import Column, Integer, String, func, DateTime, ForeignKey, CheckConstraint, TIME, PrimaryKeyConstraint, \
-    Enum, create_engine, Date, BigInteger, Boolean
+    Enum, create_engine, Date, BigInteger, Boolean, ForeignKeyConstraint, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, validates
 from sqlalchemy_utils import PhoneNumberType
 
@@ -18,9 +18,10 @@ Base = declarative_base()
 
 
 class PaymentStatusEnum(enum.Enum):
-    checked = 'Оплата подтверждена'
-    no_checked = 'Оплата произведена'
+    success = 'Успешно'
+    no_checked = 'На проверке'
     no_payment = 'Не оплачено'
+    error = 'Ошибка оплаты'
 
 
 class WeekDaysEnum(enum.Enum):
@@ -165,25 +166,42 @@ class CourseGroupTimetable(Base, BaseMixin):
         )
 
 
-class Request(Base):
+class Request(Base, BaseMixin):
     __tablename__ = "request"
 
     __table_args__ = (
-        PrimaryKeyConstraint('course_group_id', 'children_id'),
+        UniqueConstraint('course_group_id', 'children_id'),
     )
     course_group_id = Column(Integer, ForeignKey("course_group.id"))
     children_id = Column(BigInteger, ForeignKey("children.id"))
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
     payment_status = Column(Enum(PaymentStatusEnum), default=PaymentStatusEnum.no_payment)
 
     course_group = relationship("CourseGroup", back_populates="requests")
     children = relationship("Children", back_populates="requests")
+    files = relationship("RequestFile", back_populates="request")
 
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__}("
+            f"id={self.id}, "
             f"course_group={self.course_group}, "
             f"children='{self.children}', "
             f"payment_status='{self.payment_status}')>"
+        )
+
+
+class RequestFile(Base, BaseMixin):
+    __tablename__ = "request_file"
+
+    file = Column(String, nullable=False)
+    request_id = Column(BigInteger, ForeignKey("request.id"))
+
+    request = relationship("Request", back_populates="files")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.id}, "
+            f"request='{self.request}', "
+            f"file='{self.file}')>"
         )

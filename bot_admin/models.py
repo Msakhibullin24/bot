@@ -12,9 +12,10 @@ class WeekDaysEnum(models.TextChoices):
 
 
 class PaymentStatusEnum(models.TextChoices):
-    checked = 'checked', 'оплата проверена'
-    no_checked = 'no_checked', 'оплата не проверена'
-    no_payment = 'no_payment', 'не оплачено'
+    success = 'success', 'Успешно'
+    no_checked = 'no_checked', 'На проверке'
+    no_payment = 'no_payment', 'Не оплачено'
+    error = 'error', 'Ошибка оплаты'
 
 
 class AlembicVersion(models.Model):
@@ -42,7 +43,7 @@ class Children(BaseModel):
     parent = models.ForeignKey('Parent', models.DO_NOTHING, blank=True, null=True, verbose_name='Родитель')
 
     def __str__(self):
-        return f"Ребенок {self.id} {self.surname} {self.name} {self.patronymic}, {self.date_of_birth}"
+        return f"<Ребенок {self.id} {self.surname} {self.name} {self.patronymic}, {self.date_of_birth}>"
 
     class Meta:
         managed = False
@@ -58,7 +59,7 @@ class Course(BaseModel):
     age = models.IntegerField(blank=True, null=True, verbose_name='Минимальный возраст')
 
     def __str__(self):
-        return f"Курс {self.id}, {self.name}, {self.price} р. в месяц, {self.duration} минут, {self.age}+"
+        return f"<Курс {self.id}, {self.name}>"
 
     class Meta:
         managed = False
@@ -73,7 +74,7 @@ class CourseGroup(BaseModel):
     course = models.ForeignKey(Course, models.DO_NOTHING, blank=True, null=True, verbose_name='Курс', related_name='course_groups')
 
     def __str__(self):
-        return f"Группа {self.id}, {self.name}, {self.free_places} свободных мест, {self.course.name}"
+        return f"<Группа {self.id}, {self.name}, {self.course.name}>"
 
     class Meta:
         managed = False
@@ -88,7 +89,7 @@ class CourseGroupTimetable(BaseModel):
     weekday = models.TextField(blank=True, null=True, choices=WeekDaysEnum.choices, verbose_name='День недели')
 
     def __str__(self):
-        return f"Расписание группы {self.id}, {self.time}, {self.weekday}, {self.course_group}"
+        return f"<Расписание группы {self.id}, {self.time}, {self.weekday}, {self.course_group}>"
 
     class Meta:
         managed = False
@@ -104,7 +105,7 @@ class Parent(BaseModel):
     phone_number = models.CharField(unique=True, max_length=20, blank=True, null=True, verbose_name='Номер телефона')
 
     def __str__(self):
-        return f"Родитель {self.id} {self.surname} {self.name} {self.patronymic}, {self.phone_number}"
+        return f"<Родитель {self.id} {self.surname} {self.name} {self.patronymic}, {self.phone_number}>"
 
     class Meta:
         managed = False
@@ -113,21 +114,32 @@ class Parent(BaseModel):
         verbose_name_plural = 'Родители'
 
 
-class Request(models.Model):
-    course_group = models.OneToOneField(CourseGroup, models.DO_NOTHING, primary_key=True, verbose_name='Группа')
-    children = models.ForeignKey(Children, models.DO_NOTHING, verbose_name='Ребенок')
-    created_at = models.DateTimeField(blank=True, null=True, auto_now_add=True, verbose_name='Дата создания')
-    updated_at = models.DateTimeField(blank=True, null=True, auto_now=True, verbose_name='Дата изменения')
-    payment_status = models.TextField(
-        blank=True, null=True, choices=PaymentStatusEnum.choices,
-        verbose_name='Статус оплаты', default=PaymentStatusEnum.no_payment)
+class Request(BaseModel):
+    course_group = models.ForeignKey(CourseGroup, models.DO_NOTHING, blank=True, null=True, verbose_name='Группа')
+    children = models.ForeignKey(Children, models.DO_NOTHING, blank=True, null=True, verbose_name='Ребенок')
+    payment_status = models.TextField(blank=True, null=True, choices=PaymentStatusEnum.choices,
+                                      verbose_name='Статус оплаты', default=PaymentStatusEnum.no_payment)
 
     def __str__(self):
-        return f"Заявка ребенок:{self.children}, группа: {self.course_group}, статус: {self.payment_status}"
+        return f"<Запрос {self.id}, {self.course_group}, {self.children}, {self.payment_status}>"
 
     class Meta:
         managed = False
         db_table = 'request'
         unique_together = (('course_group', 'children'),)
-        verbose_name = 'Заявка'
-        verbose_name_plural = 'Заявки'
+        verbose_name = 'Запрос'
+        verbose_name_plural = 'Запросы'
+
+
+class RequestFile(BaseModel):
+    file = models.CharField(max_length=200, verbose_name='Путь до файла')
+    request = models.ForeignKey(Request, models.DO_NOTHING, blank=True, null=True, verbose_name='Запрос', related_name='files')
+
+    def __str__(self):
+        return f"<Файл {self.id}, {self.request}, {self.file}>"
+
+    class Meta:
+        managed = False
+        db_table = 'request_file'
+        verbose_name = 'Файл'
+        verbose_name_plural = 'Файл'

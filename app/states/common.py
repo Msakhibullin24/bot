@@ -13,10 +13,11 @@ bot = Bot(token=config.TOKEN)
 
 class CustomState(State):
     def __init__(self, message_text: str, keyboard: Optional[InlineKeyboardMarkup] = None,
-                 state: Optional[str] = None, group_name: Optional[str] = None):
+                 state: Optional[str] = None, group_name: Optional[str] = None, picture: Optional[str] = None):
         super().__init__(state, group_name)
         self.message_text = message_text
         self.keyboard = keyboard
+        self.picture = picture
 
     async def apply(self, message: types.Message = None, callback_query: types.CallbackQuery = None,
                     message_text: Optional[str] = None,
@@ -24,11 +25,17 @@ class CustomState(State):
         await self.set()
         if callback_query:
             await callback_query.message.edit_text(text=message_text if message_text else self.message_text)
-            if keyboard:
+            if self.picture:
+                with open(f'media/{self.picture}', 'rb') as file:
+                    return await callback_query.message.answer_photo(file, reply_markup=self.keyboard)
+            elif keyboard:
                 return await callback_query.message.edit_reply_markup(reply_markup=keyboard)
             elif self.keyboard:
                 return await callback_query.message.edit_reply_markup(reply_markup=self.keyboard)
         elif message:
+            if self.picture:
+                with open(f'media/{self.picture}', 'rb') as file:
+                    await callback_query.message.answer_photo(file)
             return await message.answer(
                 text=message_text if message_text else self.message_text,
                 reply_markup=keyboard if keyboard else self.keyboard
